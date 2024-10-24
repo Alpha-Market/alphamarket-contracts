@@ -1,0 +1,38 @@
+Q4 2024. Creator Campaigns and Rating/Review System
+
+    I. Campaigns Feature: Enable Hosts to create and manage campaigns and their sponsorships.
+        a. Create Campaign
+            - Image *
+            - Title
+            - Space link *
+            - Agenda *
+            - Date (When is deadline?)
+            - Time * 
+            - Duration * (Duration of Campaign or event)
+            - Amount of slots
+            - Price per slot
+        b. Allow Sponsorship
+            - Request to sponsorship
+            - Review requests
+            - Execute or Deny requests
+        c. Dispute Mechanism
+            - Allow community to dispute result
+            - Reverse DAO voting system? (Group level?)
+
+    II. Crypto Payments for Campaign Sponsorships: Accept cryptocurrency as payment for sponsorship slots
+        a. Determine accepted cryptocurrencies
+            - Eth?
+            - wBTC?
+            - USDC/T?
+        b. Distribute funds following campaign completion
+            - Automatic distribution mechanism (DAO/vesting wallet/straight balances?).
+            - Fee collection
+            - Giveth donation option?
+    
+    III. Rating/Review Feature: Implement reviews and ratings for Hosts and content.
+        a. On-chain?
+            - Attestations
+            - IPFS
+            - Rating/Review contract
+            - Gatekeepers to allow rating/review
+            
