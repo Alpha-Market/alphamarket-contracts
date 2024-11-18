@@ -3,9 +3,10 @@ import { ethers } from 'ethers';
 import { vars } from "hardhat/config";
 
 // Configuration constants
-// Need to configure for Arbitrum
+// Use the EAS contract address for the network you are using
 const EAS_CONTRACT_ADDRESS = "0xC2679fBD37d54388Ce493F1DB75320D236e1815e"; // Sepolia EAS contract address
 
+// Probably better served using parameters to pass in the data to increase reusability
 async function attest() {
     try {
         // Initialize provider and signer
@@ -15,8 +16,10 @@ async function attest() {
         const eas = new EAS(EAS_CONTRACT_ADDRESS);
         eas.connect(signer);
 
-        // Initialize SchemaEncoder with the schema string
         // Need to define the schema for the content we want to attest
+        const schemaUID = "SCHEMA_ID"; // The UID of the schema.
+
+        // Initialize SchemaEncoder with the schema string
         const schemaEncoder = new SchemaEncoder("YOUR_DEFINED_SCHEMA"); // e.g., bytes32 contentHash, string urlOfContent
         const encodedData = schemaEncoder.encodeData([
             { name: "", value: "", type: "" }, 
@@ -27,8 +30,6 @@ async function attest() {
             { name: "urlOfContent", value: "quicknode.com/guides/ethereum-development/smart-contracts/what-is-ethereum-attestation-service-and-how-to-use-it", type: "string" },
             */
         ]);
-
-        const schemaUID = "SCHEMA_ID"; // The UID of the schema.
 
         // Send transaction
         const tx = await eas.attest({

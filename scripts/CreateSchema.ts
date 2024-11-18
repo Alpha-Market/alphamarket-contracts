@@ -3,9 +3,11 @@ import { ethers } from 'ethers';
 import { vars } from "hardhat/config";
 
 // Configuration constants
+// Use the Schema Registry contract address for the network you are using
 const schemaRegistryContractAddress = "0x0a7E2Ff54e76B8E6659aedc9103FB21c038050D0"; // Sepolia Schema Registry contract address
 const schemaRegistry = new SchemaRegistry(schemaRegistryContractAddress);
 
+// Probably better served using parameters to pass in the data to increase reusability
 async function registerSchema() {
     try {
         // Initialize provider and signer
