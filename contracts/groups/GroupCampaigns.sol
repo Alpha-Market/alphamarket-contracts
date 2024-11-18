@@ -66,7 +66,6 @@ contract GroupCampaigns {
         uint32 slotsAvailable;
         uint256 slotPrice;
         uint256 totalRaised;
-        bool active;
     }
 
     struct Sponsor {
@@ -76,13 +75,13 @@ contract GroupCampaigns {
     }
 
     /// @notice The total number of campaigns created.
-    uint256 public campaignCount;
+    uint256 private campaignCount;
 
     /// @notice The address should be set to the DAO treasury.
-    address public protocolFeeDestination;
+    address private protocolFeeDestination;
 
     /// @notice The percentage of the transaction value to send to the protocol fee destination.
-    uint256 public protocolFeePercent;
+    uint256 private protocolFeePercent;
 
     /// @dev Solidity does not support floating point numbers, so we use fixed point math.
     /// @dev Precision also acts as the number 1 commonly used in curve calculations.
@@ -120,8 +119,29 @@ contract GroupCampaigns {
 
     /// @notice Event to log the creation of a new campaign.
     event CampaignCreated(
-        uint256 campaignId, address group, string title, uint256 deadline, uint32 slotsAvailable, uint256 slotPrice
+        uint256 indexed campaignId,
+        address indexed group,
+        string title,
+        uint256 deadline,
+        uint32 slotsAvailable,
+        uint256 slotPrice
     );
+
+    /// @notice Event to log the update of a campaign.
+    event CampaignUpdated(
+        uint256 indexed campaignId,
+        address indexed group,
+        string title,
+        uint256 deadline,
+        uint32 slotsAvailable,
+        uint256 slotPrice
+    );
+
+    /// @notice Event to log the completion of a campaign.
+    event CampaignCompleted(uint256 indexed campaignId, address indexed group, uint256 totalRaised);
+
+    /// @notice Event to log the end of a campaign.
+    event CampaignEnded(uint256 indexed campaignId, address indexed group);
 
     /*///////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -154,7 +174,7 @@ contract GroupCampaigns {
         uint256 slotPrice
     ) external {
         Campaign memory newCampaign =
-            Campaign(campaignCount, group, host, title, deadline, slotsAvailable, slotPrice, 0, true);
+            Campaign(campaignCount, group, host, title, deadline, slotsAvailable, slotPrice, 0);
 
         campaignById[campaignCount] = newCampaign;
         campaignsByGroup[group].push(newCampaign);
@@ -240,6 +260,8 @@ contract GroupCampaigns {
         campaign.deadline = deadline;
         campaign.slotsAvailable = slotsAvailable;
         campaign.slotPrice = slotPrice;
+
+        emit CampaignUpdated(campaignId, campaign.group, title, deadline, slotsAvailable, slotPrice);
     }
 
     /// @notice Allows a group host to complete a campaign.
@@ -270,7 +292,9 @@ contract GroupCampaigns {
         }
 
         campaign.totalRaised += campaignBalances[campaignId];
-        campaign.active = false;
+        campaign.deadline = 0;
+
+        emit CampaignCompleted(campaignId, campaign.group, campaign.totalRaised);
     }
 
     /// @notice Allows a group host to delete a campaign.
@@ -282,8 +306,10 @@ contract GroupCampaigns {
         } else if (campaignBalances[campaignId] > 0) {
             revert GroupCampaigns__FundingExists();
         } else {
-            campaign.active = false;
+            campaign.deadline = 0;
         }
+
+        emit CampaignEnded(campaignId, campaign.group);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -329,6 +355,21 @@ contract GroupCampaigns {
     /*///////////////////////////////////////////////////////////////
                           GETTER FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
+
+    /// @notice Gets the total number of campaigns.
+    function getCampaignCount() public view returns (uint256) {
+        return campaignCount;
+    }
+
+    /// @notice Gets the protocol fee destination.
+    function getProtocolFeeDestination() public view returns (address) {
+        return protocolFeeDestination;
+    }
+
+    /// @notice Gets the protocol fee percent.
+    function getProtocolFeePercent() public view returns (uint256) {
+        return protocolFeePercent;
+    }
 
     /// @notice Gets a campaign by its ID.
     /// @param campaignId The ID of the campaign.
@@ -388,15 +429,5 @@ contract GroupCampaigns {
         } else {
             return campaignBalances[campaignId];
         }
-    }
-
-    /// @notice Gets the protocol fee destination.
-    function getProtocolFeeDestination() public view returns (address) {
-        return protocolFeeDestination;
-    }
-
-    /// @notice Gets the protocol fee percent.
-    function getProtocolFeePercent() public view returns (uint256) {
-        return protocolFeePercent;
     }
 }
