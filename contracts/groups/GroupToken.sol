@@ -12,6 +12,9 @@ contract GroupToken is ERC20Burnable {
                                 ERRORS
     ///////////////////////////////////////////////////////////////*/
 
+    /// @dev Emitted when the bonding curve address is the zero address.
+    error GroupToken__BCAddressCannotBeZero();
+
     /// @dev Emitted when the buyer does not send the correct amount of Ether to mint the initial token.
     error GroupToken__IncorrectAmountOfEtherSent();
 
@@ -27,6 +30,12 @@ contract GroupToken is ERC20Burnable {
     /// @dev Emitted when attempting to reduce the total supply below one.
     error GroupToken__SupplyCannotBeReducedBelowOne();
 
+    /// @dev Emitted when the protocol fee transfer fails.
+    error GroupToken__ProtocolFeeTransferFailed();
+
+    /// @dev Emitted when the token sale transfer fails.
+    error GroupToken__TokenSaleTransferFailed();
+
     /*///////////////////////////////////////////////////////////////
                              STATE VARIABLES
     ///////////////////////////////////////////////////////////////*/
@@ -35,10 +44,10 @@ contract GroupToken is ERC20Burnable {
     ExponentialBondingCurve private immutable i_bondingCurve;
 
     /// @notice The total amount of Ether held in the contract.
-    uint256 public reserveBalance;
+    uint256 private reserveBalance;
 
     /// @notice The total amount of fees collected by the contract.
-    uint256 public collectedFees;
+    uint256 private collectedFees;
 
     /*///////////////////////////////////////////////////////////////
                                 EVENTS
@@ -56,7 +65,9 @@ contract GroupToken is ERC20Burnable {
 
     /// @dev Modifier to check if the transaction gas price is below the maximum gas limit.
     modifier validGasPrice() {
-        require(tx.gasprice <= i_bondingCurve.maxGasLimit(), "Transaction gas price cannot exceed maximum gas limit.");
+        require(
+            tx.gasprice <= i_bondingCurve.getMaxGasLimit(), "Transaction gas price cannot exceed maximum gas limit."
+        );
         _;
     }
 
@@ -73,11 +84,13 @@ contract GroupToken is ERC20Burnable {
         ERC20(_name, _symbol)
     {
         // Check if the bonding curve address is not the zero address and set the bonding curve instance.
-        require(_bcAddress != address(0), "ExponentialToken: bonding curve address cannot be zero address");
+        if (_bcAddress == address(0)) {
+            revert GroupToken__BCAddressCannotBeZero();
+        }
         i_bondingCurve = ExponentialBondingCurve(_bcAddress);
 
         // Mint the initial token to the contract creator.
-        if (msg.value != i_bondingCurve.initialReserve()) {
+        if (msg.value != i_bondingCurve.getInitialReserve()) {
             revert GroupToken__IncorrectAmountOfEtherSent();
         }
         reserveBalance += msg.value;
@@ -101,9 +114,9 @@ contract GroupToken is ERC20Burnable {
         reserveBalance += (msg.value - fees);
 
         // Transfer protocol fees to the protocol fee destination
-        (bool success,) = i_bondingCurve.protocolFeeDestination().call{value: fees}("");
+        (bool success,) = i_bondingCurve.getProtocolFeeDestination().call{value: fees}("");
         if (!success) {
-            revert("Protocol fee transfer failed");
+            revert GroupToken__ProtocolFeeTransferFailed();
         }
 
         // Mint tokens to the buyer
@@ -141,11 +154,10 @@ contract GroupToken is ERC20Burnable {
         salePrice -= fees;
 
         // Calculate the share of fees to be collected by the contract.
-        if (i_bondingCurve.feeSharePercent() != 0) {
-            uint256 feeShare = (fees * i_bondingCurve.feeSharePercent()) / 1e18;
-            collectedFees += feeShare;
-            fees -= feeShare;
-        }
+        uint256 feeShare =
+            i_bondingCurve.getFeeSharePercent() != 0 ? (fees * i_bondingCurve.getFeeSharePercent()) / 1e18 : 0;
+        collectedFees += feeShare;
+        fees -= feeShare;
 
         // Burn tokens from the seller.
         burnFrom(sender, amount);
@@ -154,15 +166,15 @@ contract GroupToken is ERC20Burnable {
         emit TokensSold(sender, salePrice, fees, amount);
 
         // Transfer protocol fees to the protocol fee destination
-        (bool received,) = i_bondingCurve.protocolFeeDestination().call{value: fees}("");
+        (bool received,) = i_bondingCurve.getProtocolFeeDestination().call{value: fees}("");
         if (!received) {
-            revert("Protocol fee transfer failed");
+            revert GroupToken__ProtocolFeeTransferFailed();
         }
 
         // Transfer Ether to the seller.
-        (bool sent,) = payable(sender).call{value: salePrice}("");
-        if (!sent) {
-            revert("Token sale transfer failed");
+        (bool recieved,) = payable(sender).call{value: salePrice}("");
+        if (!recieved) {
+            revert GroupToken__TokenSaleTransferFailed();
         }
     }
 
@@ -173,5 +185,15 @@ contract GroupToken is ERC20Burnable {
     /// @notice Returns the address of the ExponentialBondingCurve proxy contract.
     function getBondingCurveProxyAddress() external view returns (address) {
         return address(i_bondingCurve);
+    }
+
+    /// @notice Returns the total amount of Ether held in the contract.
+    function getReserveBalance() external view returns (uint256) {
+        return reserveBalance;
+    }
+
+    /// @notice Returns the total amount of fees collected by the contract.
+    function getCollectedFees() external view returns (uint256) {
+        return collectedFees;
     }
 }
