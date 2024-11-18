@@ -9,29 +9,29 @@ import {BancorFormula} from "./utils/BancorFormula.sol";
 /// @title ExponentialBondingCurve
 /// @author Dustin Stacy
 /// @notice This contract implements the Bancor bonding curve.
-///         The curve is defined by a reserveRatio, which determines the steepness and bend of the curve.
+/// The curve is defined by a reserveRatio, which determines the steepness and bend of the curve.
 contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgradeable, BancorFormula {
     /*///////////////////////////////////////////////////////////////
                             STATE VARIABLES
     ///////////////////////////////////////////////////////////////*/
-    /// @notice The address should be set to the DAO treasury.
-    address public protocolFeeDestination;
+    /// @notice The address that collects protocol fees.
+    address private protocolFeeDestination;
 
     /// @notice The percentage of the transaction value to send to the protocol fee destination.
-    uint256 public protocolFeePercent;
+    uint256 private protocolFeePercent;
 
     /// @dev The percentage of the collected fees to share with the token contract.
-    uint256 public feeSharePercent;
+    uint256 private feeSharePercent;
 
     /// @notice The balance of reserve tokens to initialize the bonding curve token with.
-    uint256 public initialReserve;
+    uint256 private initialReserve;
 
     /// @dev Value to represent the reserve ratio for use in calculations (in ppm).
-    uint32 public reserveRatio;
+    uint32 private reserveRatio;
 
     /// @notice The maximum gas limit for transactions.
     /// @dev This value should be set to prevent front-running attacks.
-    uint256 public maxGasLimit;
+    uint256 private maxGasLimit;
 
     /// @dev Solidity does not support floating point numbers, so we use fixed point math.
     /// @dev Precision also acts as the number 1 commonly used in curve calculations.
@@ -95,7 +95,7 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     }
 
     /*//////////////////////////////////////////////////////////////
-                            EXTERNAL FUNCTIONS
+                            PUBLIC/EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Function to calculate the amount of continuous tokens to return based on reserve tokens received.
@@ -104,10 +104,6 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /// @param reserveTokensReceived The amount of reserve tokens received (in wei).
     /// @return purchaseReturn The amount of continuous tokens to mint (in 1e18 format).
     /// @return fees The amount of protocol fees to send to the protocol fee destination (in wei).
-    ///
-    /// Gas Report     | min             | avg   | median | max   | # calls |
-    ///                | 18854           | 18979 | 18979  | 19105 | 2       |
-    ///
     function getPurchaseReturn(uint256 currentSupply, uint256 reserveTokenBalance, uint256 reserveTokensReceived)
         public
         view
@@ -130,10 +126,6 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /// @param tokensToBurn The amount of continuous tokens to burn (in 1e18 format).
     /// @return saleValue The amount of ether to return (in wei).
     /// @return fees The amount of protocol fees to send to the protocol fee destination (in wei).
-    ///
-    /// Gas Report     | min             | avg   | median | max   | # calls |
-    ///                | 18565           | 18690 | 18690  | 18816 | 2       |
-    ///
     function getSaleReturn(uint256 currentSupply, uint256 reserveTokenBalance, uint256 tokensToBurn)
         public
         view
@@ -153,11 +145,7 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /// @param reserveTokenBalance The balance of reserve tokens (in wei).
     /// @return depositAmount The amount of reserve tokens needed to mint a continuous token (in wei).
     /// @dev This function is very gas intensive and should be used with caution.
-    ///
-    /// Gas Report     | min             | avg    | median | max     | # calls |
-    ///                | 690082          | 867621 | 846733 | 1066050 | 3       |
-    ///
-    function getApproxMintCost(uint256 currentSupply, uint256 reserveTokenBalance)
+    function getMintCost(uint256 currentSupply, uint256 reserveTokenBalance)
         external
         view
         returns (uint256 depositAmount, uint256 fees)
@@ -237,6 +225,36 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /*//////////////////////////////////////////////////////////////
                             GETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @return The address that collects protocol fees.
+    function getProtocolFeeDestination() external view returns (address) {
+        return protocolFeeDestination;
+    }
+
+    /// @return The percentage of the transaction value to send to the protocol fee destination.
+    function getProtocolFeePercent() external view returns (uint256) {
+        return protocolFeePercent;
+    }
+
+    /// @return The percentage of the collected fees to share with the token contract.
+    function getFeeSharePercent() external view returns (uint256) {
+        return feeSharePercent;
+    }
+
+    /// @return The balance of reserve tokens to initialize the bonding curve token with.
+    function getInitialReserve() external view returns (uint256) {
+        return initialReserve;
+    }
+
+    /// @return The reserve ratio used to define the steepness of the bonding curve.
+    function getReserveRatio() external view returns (uint32) {
+        return reserveRatio;
+    }
+
+    /// @return The maximum gas limit for transactions.
+    function getMaxGasLimit() external view returns (uint256) {
+        return maxGasLimit;
+    }
 
     /// @return The `PRECISION` constant.
     function getPrecision() external pure returns (uint256) {
