@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Utils} from "./Utils.sol";
+import {BancorUtils} from "./BancorUtils.sol";
 
-contract BancorFormula is Utils {
+contract BancorFormula is BancorUtils {
     string private constant VERSION = "0.3";
     uint256 private constant ONE = 1;
     uint32 private constant MAX_WEIGHT = 1000000;

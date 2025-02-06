@@ -2,40 +2,13 @@
 pragma solidity ^0.8.26;
 
 import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import {ExponentialBondingCurve} from "../bonding-curves/ExponentialBondingCurve.sol";
+import {ExponentialBondingCurve} from "./ExponentialBondingCurve.sol";
+import "./Errors.sol";
 
 /// @title GroupToken
 /// @author Dustin Stacy
 /// @notice This contract implements a simple ERC20 token that can be bought and sold using an exponential bonding curve.
 contract GroupToken is ERC20Burnable {
-    /*///////////////////////////////////////////////////////////////
-                                ERRORS
-    ///////////////////////////////////////////////////////////////*/
-
-    /// @dev Emitted when the bonding curve address is the zero address.
-    error GroupToken__BCAddressCannotBeZero();
-
-    /// @dev Emitted when the buyer does not send the correct amount of Ether to mint the initial token.
-    error GroupToken__IncorrectAmountOfEtherSent();
-
-    /// @dev Emitted when attempting to perform an action with an amount that must be more than zero.
-    error GroupToken__AmountMustBeMoreThanZero();
-
-    /// @dev Emitted if the buyer does not send enough Ether to purchase the tokens.
-    error GroupToken__InsufficientFundingForTransaction();
-
-    /// @dev Emitted when attempting to burn an amount that exceeds the sender's balance.
-    error GroupToken__BurnAmountExceedsBalance();
-
-    /// @dev Emitted when attempting to reduce the total supply below one.
-    error GroupToken__SupplyCannotBeReducedBelowOne();
-
-    /// @dev Emitted when the protocol fee transfer fails.
-    error GroupToken__ProtocolFeeTransferFailed();
-
-    /// @dev Emitted when the token sale transfer fails.
-    error GroupToken__TokenSaleTransferFailed();
-
     /*///////////////////////////////////////////////////////////////
                              STATE VARIABLES
     ///////////////////////////////////////////////////////////////*/
@@ -60,18 +33,6 @@ contract GroupToken is ERC20Burnable {
     event TokensSold(address indexed seller, uint256 amountReceived, uint256 fees, uint256 tokensBurnt);
 
     /*///////////////////////////////////////////////////////////////
-                            MODIFIERS
-    ///////////////////////////////////////////////////////////////*/
-
-    /// @dev Modifier to check if the transaction gas price is below the maximum gas limit.
-    modifier validGasPrice() {
-        require(
-            tx.gasprice <= i_bondingCurve.getMaxGasLimit(), "Transaction gas price cannot exceed maximum gas limit."
-        );
-        _;
-    }
-
-    /*///////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     ///////////////////////////////////////////////////////////////*/
 
@@ -85,13 +46,13 @@ contract GroupToken is ERC20Burnable {
     {
         // Check if the bonding curve address is not the zero address and set the bonding curve instance.
         if (_bcAddress == address(0)) {
-            revert GroupToken__BCAddressCannotBeZero();
+            revert GroupToken__AddressCannotBeZero();
         }
         i_bondingCurve = ExponentialBondingCurve(_bcAddress);
 
         // Mint the initial token to the contract creator.
         if (msg.value != i_bondingCurve.getInitialReserve()) {
-            revert GroupToken__IncorrectAmountOfEtherSent();
+            revert GroupToken__InsufficientFundingForTransaction();
         }
         reserveBalance += msg.value;
         _mint(_host, 1e18);
@@ -102,9 +63,9 @@ contract GroupToken is ERC20Burnable {
     ///////////////////////////////////////////////////////////////*/
 
     /// @notice Allows a user to mint tokens by sending Ether to the contract.
-    function mintTokens() external payable validGasPrice {
+    function mintTokens() external payable {
         if (msg.value == 0) {
-            revert GroupToken__AmountMustBeMoreThanZero();
+            revert GroupToken__AmountMustBeGreaterThanZero();
         }
 
         // Calculate the amount of tokens to mint.
@@ -129,15 +90,19 @@ contract GroupToken is ERC20Burnable {
     /// @notice Allows a user to burn tokens and receive ether from the contract.
     /// @param amount The amount of tokens to burn.
     /// @param sender The address of the sender.
-    function burnTokens(uint256 amount, address sender) external validGasPrice {
-        if (amount == 0) {
-            revert GroupToken__AmountMustBeMoreThanZero();
+    function burnTokens(uint256 amount, address sender) external {
+        if (sender == address(0)) {
+            revert GroupToken__AddressCannotBeZero();
         }
 
-        /// Do we want to enforce this to prevent bricking the contract?
-        if (totalSupply() - amount < 1e18) {
-            revert GroupToken__SupplyCannotBeReducedBelowOne();
+        if (amount == 0) {
+            revert GroupToken__AmountMustBeGreaterThanZero();
         }
+
+        /// @dev Do we want to enforce this to prevent potentially bricking the contract?
+        // if (totalSupply() - amount < 1e18) {
+        //     revert GroupToken__SupplyCannotBeReducedBelowOne();
+        // }
 
         // Check if the seller has enough tokens to burn.
         uint256 balance = balanceOf(sender);

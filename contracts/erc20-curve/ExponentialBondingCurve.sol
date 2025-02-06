@@ -5,12 +5,20 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {BancorFormula} from "./utils/BancorFormula.sol";
+import {Utils} from "../Utils.sol";
 
 /// @title ExponentialBondingCurve
 /// @author Dustin Stacy
 /// @notice This contract implements the Bancor bonding curve.
 /// The curve is defined by a reserveRatio, which determines the steepness and bend of the curve.
 contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgradeable, BancorFormula {
+    /*///////////////////////////////////////////////////////////////
+                            ERRORS
+    ///////////////////////////////////////////////////////////////*/
+
+    /// @notice Error to be used when an address is the zero address.
+    error ExponentialBondingCurve__FeeDestinationCannotBeZeroAddress();
+
     /*///////////////////////////////////////////////////////////////
                             STATE VARIABLES
     ///////////////////////////////////////////////////////////////*/
@@ -20,32 +28,39 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /// @notice The percentage of the transaction value to send to the protocol fee destination.
     uint256 private protocolFeePercent;
 
-    /// @dev The percentage of the collected fees to share with the token contract.
+    /// @notice The percentage of the collected fees to share with the group contract.
+    /// @dev Could be used in conjuction with a Paymaster to facilitate gasless transactions.
     uint256 private feeSharePercent;
 
     /// @notice The balance of reserve tokens to initialize the bonding curve token with.
+    /// @dev Could institue a formula to set the initial reserve based on a flat fiat amount.
     uint256 private initialReserve;
-
-    /// @dev Value to represent the reserve ratio for use in calculations (in ppm).
-    uint32 private reserveRatio;
-
-    /// @notice The maximum gas limit for transactions.
-    /// @dev This value should be set to prevent front-running attacks.
-    uint256 private maxGasLimit;
 
     /// @dev Solidity does not support floating point numbers, so we use fixed point math.
     /// @dev Precision also acts as the number 1 commonly used in curve calculations.
     uint256 private constant PRECISION = 1e18;
 
-    /// @dev Precision for basis points calculations.
-    /// @dev This is used to convert the protocol fee to a fraction.
-    uint256 private constant BASIS_POINTS_PRECISION = 1e4;
+    /// @dev Value to represent the reserve ratio for use in calculations (in ppm).
+    uint32 private reserveRatio;
 
-    /// @dev The maximum value for basis points.
-    uint256 private constant MAX_BASIS_POINTS = 1e5;
+    /*///////////////////////////////////////////////////////////////
+                            EVENTS
+    ///////////////////////////////////////////////////////////////*/
 
-    /// @dev The maximum value for the reserve ratio.
-    uint32 private constant MAX_RESERVE_RATIO = 1e7;
+    /// @notice Emitted when the protocol fee destination is updated.
+    event ProtocolFeeDestinationUpdated(address indexed newDestination);
+
+    /// @notice Emitted when the protocol fee percentage is updated.
+    event ProtocolFeePercentUpdated(uint256 newPercent);
+
+    /// @notice Emitted when the fee share percentage is updated.
+    event FeeSharePercentUpdated(uint256 newPercent);
+
+    /// @notice Emitted when the initial reserve is updated.
+    event InitialReserveUpdated(uint256 newReserve);
+
+    /// @notice Emitted when the reserve ratio is updated.
+    event ReserveRatioUpdated(uint32 newRatio);
 
     /*///////////////////////////////////////////////////////////////
                         INITIALIZER FUNCTIONS
@@ -63,34 +78,26 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     /// @param _feeSharePercent The collected fee share percentage represented in basis points.
     /// @param _initialReserve The balance of reserve tokens to initialize the bonding curve token with.
     /// @param _reserveRatio The reserve ratio in ppm.
-    /// @param _maxGasLimit The maximum gas limit for transactions.
     function initialize(
         address _owner,
         address _protocolFeeDestination,
         uint256 _protocolFeePercent,
         uint256 _feeSharePercent,
         uint256 _initialReserve,
-        uint32 _reserveRatio,
-        uint256 _maxGasLimit
+        uint32 _reserveRatio
     ) public initializer {
-        require(
-            _owner != address(0) && _protocolFeeDestination != address(0) && _protocolFeePercent > 0
-                && _protocolFeePercent < MAX_BASIS_POINTS && _feeSharePercent < MAX_BASIS_POINTS && _initialReserve > 0
-                && _reserveRatio < MAX_RESERVE_RATIO && _maxGasLimit > 0,
-            "ExponentialBondingCurve: Invalid parameters"
-        );
+        if (_owner == address(0) || _protocolFeeDestination == address(0)) {
+            revert ExponentialBondingCurve__FeeDestinationCannotBeZeroAddress();
+        }
         __Ownable_init(_owner);
         __UUPSUpgradeable_init();
         protocolFeeDestination = _protocolFeeDestination;
-        protocolFeePercent = _protocolFeePercent * PRECISION / BASIS_POINTS_PRECISION;
+        protocolFeePercent = _protocolFeePercent;
         initialReserve = _initialReserve;
         reserveRatio = _reserveRatio;
-        maxGasLimit = _maxGasLimit;
 
         if (_feeSharePercent > 0) {
-            feeSharePercent = _feeSharePercent * PRECISION / BASIS_POINTS_PRECISION;
-        } else {
-            feeSharePercent = 0;
+            feeSharePercent = _feeSharePercent;
         }
     }
 
@@ -110,7 +117,8 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
         returns (uint256 purchaseReturn, uint256 fees)
     {
         // Calculate the protocol fees.
-        fees = ((reserveTokensReceived * PRECISION / (protocolFeePercent + PRECISION)) * protocolFeePercent) / PRECISION;
+        fees = Utils.calculateBasisPointsPercentage(reserveTokensReceived, protocolFeePercent);
+
         uint256 remainingReserveTokens = reserveTokensReceived - fees;
 
         // Calculate the amount of tokens to mint.
@@ -135,7 +143,7 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
         saleValue = calculateSaleReturn(currentSupply, reserveTokenBalance, reserveRatio, tokensToBurn);
 
         // Calculate the protocol fees.
-        fees = (saleValue * protocolFeePercent) / PRECISION;
+        fees = Utils.calculateBasisPointsPercentage(saleValue, protocolFeePercent);
 
         return (saleValue, fees);
     }
@@ -188,38 +196,45 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
     }
 
     /*//////////////////////////////////////////////////////////////
-                            SETTER FUNCTIONS
+                            SETTER FUNCTIONS (OWNER)
     //////////////////////////////////////////////////////////////*/
 
     /// @param _feeDestination The address to send protocol fees to.
     function setProtocolFeeDestination(address _feeDestination) external onlyOwner {
-        require(_feeDestination != address(0), "ExponentialBondingCurve: Fee destination cannot be the zero address");
+        if (_feeDestination == address(0)) {
+            revert ExponentialBondingCurve__FeeDestinationCannotBeZeroAddress();
+        }
         protocolFeeDestination = _feeDestination;
+
+        emit ProtocolFeeDestinationUpdated(_feeDestination);
     }
 
     /// @param _basisPoints The percentage of the transaction to send to the protocol fee destination represented in basis points.
     function setProtocolFeePercent(uint256 _basisPoints) external onlyOwner {
-        protocolFeePercent = _basisPoints * PRECISION / BASIS_POINTS_PRECISION;
+        protocolFeePercent = _basisPoints;
+
+        emit ProtocolFeePercentUpdated(_basisPoints);
     }
 
     /// @param _basisPoints The collected fee share percentage for selling tokens represented in basis points.
     function setFeeSharePercent(uint256 _basisPoints) external onlyOwner {
-        feeSharePercent = _basisPoints * PRECISION / BASIS_POINTS_PRECISION;
+        feeSharePercent = _basisPoints;
+
+        emit FeeSharePercentUpdated(_basisPoints);
     }
 
     /// @param _initialReserve The balance of reserve tokens to initialize the bonding curve token with.
     function setInitialReserve(uint256 _initialReserve) external onlyOwner {
         initialReserve = _initialReserve;
+
+        emit InitialReserveUpdated(_initialReserve);
     }
 
     /// @param _reserveRatio The reserve ratio used to define the steepness of the bonding curve in ppm.
     function setReserveRatio(uint32 _reserveRatio) external onlyOwner {
         reserveRatio = _reserveRatio;
-    }
 
-    /// @param _maxGasLimit The maximum gas limit for transactions.
-    function setMaxGasLimit(uint256 _maxGasLimit) external onlyOwner {
-        maxGasLimit = _maxGasLimit;
+        emit ReserveRatioUpdated(_reserveRatio);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -251,29 +266,9 @@ contract ExponentialBondingCurve is Initializable, OwnableUpgradeable, UUPSUpgra
         return reserveRatio;
     }
 
-    /// @return The maximum gas limit for transactions.
-    function getMaxGasLimit() external view returns (uint256) {
-        return maxGasLimit;
-    }
-
     /// @return The `PRECISION` constant.
     function getPrecision() external pure returns (uint256) {
         return PRECISION;
-    }
-
-    /// @return The `BASIS_POINTS_PRECISION` constant.
-    function getBasisPointsPrecision() external pure returns (uint256) {
-        return BASIS_POINTS_PRECISION;
-    }
-
-    /// @return The `MAX_BASIS_POINTS` constant.
-    function getMaxBasisPoints() external pure returns (uint256) {
-        return MAX_BASIS_POINTS;
-    }
-
-    /// @return The `MAX_RESERVE_RATIO` constant.
-    function getMaxReserveRatio() external pure returns (uint32) {
-        return MAX_RESERVE_RATIO;
     }
 
     /*//////////////////////////////////////////////////////////////

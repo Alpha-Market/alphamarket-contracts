@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 /*
     Utilities & Common Modifiers
 */
-abstract contract Utils {
+abstract contract BancorUtils {
     // verifies that an amount is greater than zero
     modifier greaterThanZero(uint256 _amount) {
         require(_amount > 0);
