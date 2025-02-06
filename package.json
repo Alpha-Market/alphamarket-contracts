@@ -1,8 +1,13 @@
 {
-    "name": "nexus-nft",
+    "name": "alphamarket",
     "version": "0.1.0",
     "private": true,
-    "scripts": {},
+    "scripts": {
+        "compile": "hardhat compile",
+        "test": "hardhat test",
+        "format": "prettier --write .",
+        "lint": "prettier --check ."
+    },
     "dependencies": {
         "@ethereum-attestation-service/eas-sdk": "^2.7.0",
         "@openzeppelin/contracts": "^5.0.2",
@@ -11,7 +16,10 @@
     },
     "devDependencies": {
         "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "@openzeppelin/hardhat-upgrades": "^3.7.0",
         "hardhat": "^2.22.10",
+        "hardhat-exposed": "^0.3.15",
+        "prettier": "^3.4.2",
         "ts-node": "^10.9.2",
         "typescript": "^5.6.2"
     }

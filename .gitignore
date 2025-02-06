@@ -4,6 +4,7 @@ node_modules
 # Hardhat files
 /cache
 /artifacts
+contracts-exposed
 
 # TypeChain files
 /typechain
@@ -22,3 +23,17 @@ deployed_addresses.json
 
 # VSCode files
 .vscode
+
+# Graph Data files
+dist/
+output.json
+index.html
+
+# Makefile
+Makefile
+
+# Text files
+roadmap.txt
+slither.txt
+coverage.txt
+gasReport.txt

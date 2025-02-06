@@ -1,0 +1,53 @@
+name: Alpha Market CI
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    check-formatting:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3 # Use latest version
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v3 # Use latest version
+              with:
+                  node-version: '22'
+
+            - name: Install dependencies
+              run: |
+                  npm install
+
+            - name: Check Prettier formatting
+              run: |
+                  npx prettier --check .
+
+    run-hardhat-tests:
+        runs-on: ubuntu-latest
+        needs: check-formatting
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3 # Use latest version
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: '22'
+
+            - name: Install dependencies
+              run: |
+                  npm install
+
+            - name: Set Hardhat variables
+              run: |
+                  npx hardhat vars set ALCHEMY_API_KEY ${{ secrets.ALCHEMY_API_KEY }}
+
+            - name: Run Hardhat tests
+              run: |
+                  npx hardhat test

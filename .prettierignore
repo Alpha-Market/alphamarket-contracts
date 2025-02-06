@@ -1,0 +1,14 @@
+# Ignore the node_modules folder
+node_modules/
+
+# Ignore build folder
+build/
+
+# Ignore coverage folder
+coverage/
+
+# Ignore specific files
+deployed_addresses.json
+
+# Ignore README
+README.md
